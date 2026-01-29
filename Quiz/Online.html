@@ -3,32 +3,52 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>BMP SmartQuiz Online Loader</title>
+  <title>BMP SmartQuiz Online</title>
+
+  <!-- Preconnect để giảm delay DNS/TLS -->
+  <link rel="preconnect" href="https://gist.githubusercontent.com">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link rel="preconnect" href="https://polyfill.io">
+
   <style>
-    body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:24px;line-height:1.4}
-    .box{max-width:820px;margin:0 auto;padding:16px 18px;border:1px solid #ddd;border-radius:12px}
+    body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:24px;line-height:1.4;background:#fafafa}
+    .box{max-width:860px;margin:0 auto;padding:16px 18px;border:1px solid #ddd;border-radius:12px;background:#fff}
     code{word-break:break-all}
+    .bar{height:10px;background:#eee;border-radius:999px;overflow:hidden;margin-top:12px}
+    .bar > div{height:100%;width:0%;background:#4a90e2;transition:width .25s}
+    .small{margin-top:10px;color:#666;font-size:13px}
   </style>
 </head>
 <body>
   <div class="box">
     <h2>⏳ Đang tải đề...</h2>
     <div id="msg">Vui lòng chờ trong giây lát.</div>
-    <div style="margin-top:10px;color:#666;font-size:13px">
-      Nếu đứng mãi, hãy kiểm tra link có dạng <code>?data=...</code> và Gist raw_url còn truy cập được.
+    <div class="bar"><div id="bar"></div></div>
+    <div class="small">
+      Nếu đứng mãi, hãy kiểm tra link có dạng <code>?data=...</code> và <code>raw_url</code> còn truy cập được.
     </div>
   </div>
 
 <script>
 (function(){
-  const msg = (t)=>{ try{ document.getElementById('msg').innerHTML = t; }catch(e){} };
+  const msgEl = document.getElementById('msg');
+  const barEl = document.getElementById('bar');
+  const msg = (t)=>{ try{ msgEl.innerHTML = t; }catch(e){} };
+  const setBar = (p)=>{ try{ barEl.style.width = Math.max(0, Math.min(100, p)) + '%'; }catch(e){} };
+
+  // Progress “giả lập” để user đỡ thấy treo (tăng dần tới 85% rồi chờ fetch xong)
+  let prog = 5;
+  setBar(prog);
+  const timer = setInterval(()=>{
+    if (prog < 85) prog += Math.random()*6;
+    setBar(prog);
+  }, 300);
 
   function getParam(name){
     try{
       const u = new URL(window.location.href);
       return u.searchParams.get(name) || '';
     }catch(e){
-      // fallback
       const m = new RegExp('[?&]'+name+'=([^&]+)').exec(location.search);
       return m ? decodeURIComponent(m[1]) : '';
     }
@@ -36,37 +56,48 @@
 
   const data = getParam('data');
   if(!data){
+    clearInterval(timer);
+    setBar(0);
     msg('❌ Thiếu tham số <code>data</code> trong URL.<br/>Ví dụ: <code>?data=BASE64(raw_url)</code>');
     return;
   }
 
   let rawUrl = '';
-  try{
-    rawUrl = atob(data);
-  }catch(e){
+  try{ rawUrl = atob(data); }
+  catch(e){
+    clearInterval(timer);
+    setBar(0);
     msg('❌ Không giải mã được <code>data</code> (base64).');
     return;
   }
+
   rawUrl = (rawUrl||'').trim();
   if(!/^https?:\/\//i.test(rawUrl)){
+    clearInterval(timer);
+    setBar(0);
     msg('❌ <code>raw_url</code> không hợp lệ: <code>'+rawUrl+'</code>');
     return;
   }
 
   msg('🔗 Đang tải nội dung đề từ:<br/><code>'+rawUrl+'</code>');
 
-  fetch(rawUrl, {cache:'no-store'})
+  // ✅ TỐI ƯU: cho phép cache (đỡ tải lại HTML lớn từ Gist)
+  fetch(rawUrl, { cache: 'force-cache', credentials: 'omit' })
     .then(r=>{
       if(!r.ok) throw new Error('HTTP '+r.status);
       return r.text();
     })
     .then(html=>{
+      clearInterval(timer);
+      setBar(100);
       // Replace current document with fetched HTML (origin stays GitHub Pages)
       document.open();
       document.write(html);
       document.close();
     })
     .catch(err=>{
+      clearInterval(timer);
+      setBar(0);
       msg('❌ Tải thất bại: <b>'+String(err)+'</b><br/>Hãy mở thử raw_url trên trình duyệt để kiểm tra có bị 404 hay bị private không.');
     });
 })();
