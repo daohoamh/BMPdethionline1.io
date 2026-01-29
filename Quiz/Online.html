@@ -1,1 +1,76 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>BMP SmartQuiz Online Loader</title>
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:24px;line-height:1.4}
+    .box{max-width:820px;margin:0 auto;padding:16px 18px;border:1px solid #ddd;border-radius:12px}
+    code{word-break:break-all}
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h2>⏳ Đang tải đề...</h2>
+    <div id="msg">Vui lòng chờ trong giây lát.</div>
+    <div style="margin-top:10px;color:#666;font-size:13px">
+      Nếu đứng mãi, hãy kiểm tra link có dạng <code>?data=...</code> và Gist raw_url còn truy cập được.
+    </div>
+  </div>
+
+<script>
+(function(){
+  const msg = (t)=>{ try{ document.getElementById('msg').innerHTML = t; }catch(e){} };
+
+  function getParam(name){
+    try{
+      const u = new URL(window.location.href);
+      return u.searchParams.get(name) || '';
+    }catch(e){
+      // fallback
+      const m = new RegExp('[?&]'+name+'=([^&]+)').exec(location.search);
+      return m ? decodeURIComponent(m[1]) : '';
+    }
+  }
+
+  const data = getParam('data');
+  if(!data){
+    msg('❌ Thiếu tham số <code>data</code> trong URL.<br/>Ví dụ: <code>?data=BASE64(raw_url)</code>');
+    return;
+  }
+
+  let rawUrl = '';
+  try{
+    rawUrl = atob(data);
+  }catch(e){
+    msg('❌ Không giải mã được <code>data</code> (base64).');
+    return;
+  }
+  rawUrl = (rawUrl||'').trim();
+  if(!/^https?:\/\//i.test(rawUrl)){
+    msg('❌ <code>raw_url</code> không hợp lệ: <code>'+rawUrl+'</code>');
+    return;
+  }
+
+  msg('🔗 Đang tải nội dung đề từ:<br/><code>'+rawUrl+'</code>');
+
+  fetch(rawUrl, {cache:'no-store'})
+    .then(r=>{
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return r.text();
+    })
+    .then(html=>{
+      // Replace current document with fetched HTML (origin stays GitHub Pages)
+      document.open();
+      document.write(html);
+      document.close();
+    })
+    .catch(err=>{
+      msg('❌ Tải thất bại: <b>'+String(err)+'</b><br/>Hãy mở thử raw_url trên trình duyệt để kiểm tra có bị 404 hay bị private không.');
+    });
+})();
+</script>
+</body>
+</html>
 
